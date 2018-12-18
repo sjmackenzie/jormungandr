@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use std::collections::BTreeMap;
 
 use cardano_storage::StorageConfig;
-use cardano_storage::{tag, Storage, blob, block_read};
+use cardano_storage::{tag, Storage, blob};
 use cardano_storage::chain_state::restore_chain_state;
 
 use crate::blockcfg::{
@@ -88,8 +88,11 @@ impl Blockchain<Cardano> {
         // way to check that.
         if block_hash != self.chain_state.last_block {
 
-            blob::write(&self.storage, &block_hash, cbor!(block).unwrap().as_ref())
-                .expect("unable to write block to disk");
+            blob::write(
+                &self.storage,
+                block_hash.as_hash_bytes(),
+                cbor!(block).unwrap().as_ref()
+            ).expect("unable to write block to disk");
 
             // Compute the new chain state. In the common case, the
             // incoming block is a direct successor of the tip, so we
@@ -141,7 +144,7 @@ impl Blockchain<Cardano> {
         // sure that this invariant is preserved everywhere
         // (e.g. loose block GC should delete blocks in reverse
         // order).
-        block_read(&self.storage, block_hash).is_ok()
+        self.storage.read_block(block_hash.as_hash_bytes()).is_ok()
     }
 
     /// Request a missing block from the network.

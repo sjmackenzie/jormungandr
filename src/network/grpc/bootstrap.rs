@@ -42,7 +42,7 @@ pub fn bootstrap_from_peer(peer: Peer, blockchain: BlockchainR<Cardano>) {
         .and_then(|mut client| {
             let tip = blockchain.read().unwrap().get_tip();
             let req = cardano_proto::HeaderHashes {
-                hashes: vec![tip.to_vec()],
+                hashes: vec![tip.as_hash_bytes().to_vec()],
             };
             client
                 .stream_blocks_to_tip(Request::new(req))
