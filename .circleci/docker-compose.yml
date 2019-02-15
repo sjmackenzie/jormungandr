@@ -1,0 +1,12 @@
+version: '3.3'
+networks:
+  cardano:
+    ipam:
+      config:
+        - subnet: 10.0.0.0/16
+services:
+  test_runner:
+    build: test_runner
+    networks:
+      cardano:
+        ipv4_address: '10.0.1.0'

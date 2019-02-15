@@ -1,102 +1,133 @@
-version: 2
-jobs:
-  cargo_fetch:
-    docker:
-      - image: rust:latest
-    working_directory: /mnt/crate
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - cargo-v2-{{ checksum "Cargo.toml" }}-
-            - cargo-v2-
-      - run: cargo update
-      - run: cargo fetch
-      - persist_to_workspace:
-          root: "."
-          paths:
-            - Cargo.lock
-      - save_cache:
-          key: cargo-v2-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-          paths:
-            - /usr/local/cargo/registry
-            - /usr/local/cargo/git
-  test:
-    docker:
-      - image: rust:latest
-    working_directory: /mnt/crate
-    steps:
-      - checkout
-      - attach_workspace:
-          at: "."
-      - restore_cache:
-          keys:
-            - cargo-v2-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Print version information
-          command: rustc --version; cargo --version
-      - run:
-          name: Build and test
-          command: cargo test --frozen --verbose
-          environment:
-            # Need this for the coverage run
-            RUSTFLAGS: "-C link-dead-code"
-      - run:
-          name: Prune the output files
-          command: |
-            for file in target/debug/* target/debug/.??*; do
-              [ -d $file -o ! -x $file ] && rm -r $file
-            done
-      - persist_to_workspace:
-          root: "."
-          paths:
-            - target/debug/*
-  test_release:
-    docker:
-      - image: rust:latest
-    working_directory: /mnt/crate
-    steps:
-      - checkout
-      - attach_workspace:
-          at: "."
-      - restore_cache:
-          keys:
-            - cargo-v2-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Print version information
-          command: rustc --version; cargo --version
-      - run:
-          name: Build and test in release profile
-          command: cargo test --release --frozen --verbose
-  test_nightly:
-    docker:
-      - image: rustlang/rust:nightly
-    working_directory: /mnt/crate
-    steps:
-      - checkout
-      - attach_workspace:
-          at: "."
-      - restore_cache:
-          keys:
-            - cargo-v2-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Print version information
-          command: rustc --version; cargo --version
-      - run:
-          name: Build and test with nightly Rust
-          command: cargo test --frozen --verbose
-
+version: 2.1
 workflows:
-  version: 2
-  test_all:
+  integration_tests:
     jobs:
-      - cargo_fetch
-      - test:
-          requires:
-            - cargo_fetch
-      - test_release:
-          requires:
-            - cargo_fetch
-      - test_nightly:
-          requires:
-            - cargo_fetch
+      - build
+      - build_cli
+      - test_node_alive: { requires: [build, build_cli] }
+jobs:
+  test_job_template: &test_job_template
+    docker:
+      - image: circleci/rust:1.32
+    steps: [ run: 'echo "Error: define steps for test job created from template!" && exit 1' ]
+
+  test_node_alive:
+    <<: *test_job_template
+    steps: [ run_test: { node_count: 1, test_file: test_node_alive } ]
+
+  build:
+    docker:
+      - image: circleci/rust:1.32
+    steps:
+      - checkout
+      - run: |
+          git submodule sync
+          git submodule update --init
+      - restore_cache:
+          key: cargo_{{ checksum "Cargo.lock" }}_v3
+      - run: cargo build --bins --release
+      - save_cache:
+          key: cargo_{{ checksum "Cargo.lock" }}_v3
+          paths: [target, /usr/local/cargo/registry, /usr/local/cargo/git]
+      - run: |
+          mkdir output
+          find target/release -maxdepth 1 -type f ! -name '*.*' | xargs mv -t output
+      - persist_to_workspace:
+          root: output
+          paths: ['*']
+      - persist_to_workspace:
+          root: .circleci
+          paths: [node_config.yml, genesis.json, Dockerfile, test_runner, docker-compose.yml]
+
+  build_cli:
+    docker:
+      - image: circleci/rust:1.32
+    steps:
+      - run: git ls-remote  git://github.com/input-output-hk/cardano-cli.git master > master_hash
+      - restore_cache:
+          key: cli_{{ checksum "master_hash" }}_v5
+      - run: |
+          if [ ! -e output ]; then
+              git clone --recurse-submodules git://github.com/input-output-hk/cardano-cli.git
+              cargo build --manifest-path cardano-cli/Cargo.toml
+              mkdir output
+              mv cardano-cli/target/debug/cardano-cli output
+          fi
+      - save_cache:
+          key: cli_{{ checksum "master_hash" }}_v5
+          paths: [output]
+      - persist_to_workspace:
+          root: output
+          paths: [cardano-cli]
+
+commands:
+  run_test:
+    parameters:
+      node_count: { type: integer }
+      test_file: { type: string }
+    steps:
+      - setup_remote_docker
+      - attach_workspace: { at: . }
+      - run:
+          name: 'prepare environment'
+          command: |
+              node_count=<< parameters.node_count >>
+              test_file=<< parameters.test_file >>
+
+              # Prepare test runner
+              mv $test_file test_runner/test
+
+              for node in `seq 1 $node_count`; do
+                node_id=node_$node
+
+                # Prepare node directory
+                mkdir $node_id
+                cp Dockerfile $node_id
+                cp jormungandr $node_id
+
+                # Generate keys
+                ./cardano-cli debug generate-xprv $node_id/key.xprv
+                pub_key=`./cardano-cli debug xprv-to-xpub $node_id/key.xprv /dev/stdout`
+
+                # Add public key to every node's node_config.yml leaders
+                echo "    - $pub_key" >> node_config.yml
+
+                # Add private key to every node's genesis.json boot stakeholders
+                echo "\"$(cat $node_id/key.xprv)\": 1" >> genesis.json
+                if [ $node = $node_count ]; then
+                  echo "}}" >> genesis.json
+                else
+                  echo "," >> genesis.json
+                fi
+
+                # Register node container in docker-compose.yml
+                docker_compose='docker-compose.yml'
+                echo "  $node_id:                                               " >> $docker_compose
+                echo "    build: $node_id                                       " >> $docker_compose
+                echo "    networks: { cardano: { ipv4_address: 10.0.1.$node } } " >> $docker_compose
+                echo "    volumes: [ './$node_id/data/:/data' ]                 " >> $docker_compose
+              done
+              for node in `seq 1 $node_count`; do
+                node_id=node_$node
+
+                # Copy node_config.yml and genesis.json with every node's data
+                cp genesis.json $node_id
+                cp node_config.yml $node_id
+
+                # Add legacy listener address to node's node_config.yml
+                node_config=$node_id/node_config.yml
+                echo "legacy_listen:        " >> $node_config
+                echo "  - 10.0.1.$node:10000" >> $node_config
+
+                # Add legacy peers addresses to node's node_config.yml
+                echo "legacy_peers:               " >> $node_config
+                for peer in `seq 1 $node_count`; do
+                  if [ $peer -ne $node ]; then
+                    echo "  - 10.0.1.$peer:10000  " >> $node_config
+                  fi
+                done
+              done
+              docker-compose build
+      - run:
+          name: 'run test'
+          command: docker-compose up --no-color --exit-code-from test_runner

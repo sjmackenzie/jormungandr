@@ -41,6 +41,7 @@ lazy_static = "1.2.0"
 prost-derive = "0.4"
 actix-net = "0.2.6"
 native-tls = "0.2.2"
+reqwest = "0.9.9"
 tokio-connect = { git = "https://github.com/carllerche/tokio-connect" }
 tower-h2 = { git = "https://github.com/tower-rs/tower-h2" }
 tower-util = { git = "https://github.com/tower-rs/tower" }
