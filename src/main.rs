@@ -3,8 +3,6 @@ extern crate bincode;
 extern crate clap;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate serde_json;
 extern crate serde_yaml;
 #[macro_use(o)]
 extern crate slog;
@@ -38,10 +36,6 @@ extern crate tower_grpc;
 extern crate tower_h2;
 extern crate tower_util;
 
-extern crate actix_net;
-extern crate actix_web;
-extern crate native_tls;
-
 #[cfg(test)]
 extern crate quickcheck;
 #[cfg(test)]
@@ -62,11 +56,9 @@ pub mod consensus;
 pub mod intercom;
 pub mod leadership;
 pub mod network;
-pub mod rest;
 pub mod secure;
 pub mod settings;
 pub mod state;
-pub mod stats;
 pub mod transaction;
 pub mod utils;
 
@@ -74,12 +66,9 @@ use settings::Settings;
 //use state::State;
 use blockchain::{Blockchain, BlockchainR};
 use futures::sync::mpsc::UnboundedSender;
-use futures::Future;
 use intercom::BlockMsg;
 use intercom::NetworkBroadcastMsg;
 use leadership::{leadership_task, Selection};
-use rest::ServerState;
-use stats::SharedStats;
 use transaction::{transaction_task, TPool};
 use utils::task::Tasks;
 
@@ -97,17 +86,10 @@ fn block_task(
     _clock: clock::Clock, // FIXME: use it or lose it
     r: Receiver<BlockMsg<Cardano>>,
     network_broadcast: UnboundedSender<NetworkBroadcastMsg<Cardano>>,
-    shared_stats: SharedStats,
 ) {
     loop {
         let bquery = r.recv().unwrap();
-        blockchain::process(
-            &blockchain,
-            &selection,
-            bquery,
-            &network_broadcast,
-            &shared_stats,
-        );
+        blockchain::process(&blockchain, &selection, bquery, &network_broadcast);
     }
 }
 
@@ -201,14 +183,11 @@ fn run() -> Result<(), Error> {
     // initialize the transaction broadcast channel
     let (broadcast_sender, broadcast_receiver) = futures::sync::mpsc::unbounded();
 
-    let shared_stats = SharedStats::default();
-
     let transaction_task = {
         let tpool = tpool.clone();
         let blockchain = blockchain.clone();
-        let shared_stats = shared_stats.clone();
         tasks.task_create_with_inputs("transaction", move |r| {
-            transaction_task(blockchain, tpool, r, shared_stats)
+            transaction_task(blockchain, tpool, r)
         })
     };
 
@@ -216,16 +195,8 @@ fn run() -> Result<(), Error> {
         let blockchain = blockchain.clone();
         let clock = clock.clone();
         let selection = Arc::clone(&selection);
-        let shared_stats = shared_stats.clone();
         tasks.task_create_with_inputs("block", move |r| {
-            block_task(
-                blockchain,
-                selection,
-                clock,
-                r,
-                broadcast_sender,
-                shared_stats,
-            )
+            block_task(blockchain, selection, clock, r, broadcast_sender)
         })
     };
 
@@ -277,26 +248,12 @@ fn run() -> Result<(), Error> {
         });
     };
 
-    let rest_server = match settings.rest {
-        Some(ref rest) => {
-            let state = ServerState {
-                stats: shared_stats,
-            };
-            Some(rest::start_rest_server(rest, state)?)
-        }
-        None => None,
-    };
-
     // periodically cleanup (custom):
     //   storage cleanup/packing
     //   tpool.gc()
 
     // FIXME some sort of join so that the main thread does something ...
     tasks.join();
-
-    if let Some(server) = rest_server {
-        server.stop().wait().unwrap()
-    }
 
     Ok(())
 }

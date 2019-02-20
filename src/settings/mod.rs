@@ -1,7 +1,6 @@
 mod command_arguments;
 mod config;
 pub mod network;
-use rest;
 
 use cardano::config::GenesisData;
 use exe_common::parse_genesis_data::parse_genesis_data;
@@ -19,7 +18,7 @@ use std::{
 
 pub use self::command_arguments::CommandArguments;
 use self::config::ConfigLogSettings;
-pub use self::config::{Bft, BftConstants, BftLeader, Genesis, GenesisConstants, LogFormat, Rest};
+pub use self::config::{Bft, BftConstants, BftLeader, Genesis, GenesisConstants, LogFormat};
 use self::network::{Connection, Listen, Peer, Protocol};
 use crate::log_wrapper;
 
@@ -29,7 +28,6 @@ pub enum Error {
     NoConsensusAlg,
     NoStorage,
     NoSecret,
-    InvalidRest(rest::Error),
 }
 
 impl Display for Error {
@@ -42,7 +40,6 @@ impl Display for Error {
                 "storage is needed for persistently saving the blocks of the blockchain"
             ),
             Error::NoSecret => write!(f, "secret config unspecified"),
-            Error::InvalidRest(e) => write!(f, "invalid REST config: {}", e),
         }
     }
 }
@@ -54,7 +51,6 @@ impl std::error::Error for Error {
             Error::NoConsensusAlg => None,
             Error::NoStorage => None,
             Error::NoSecret => None,
-            Error::InvalidRest(e) => Some(e),
         }
     }
 }
@@ -98,8 +94,6 @@ pub struct Settings {
     pub leadership: Leadership,
 
     pub log_settings: LogSettings,
-
-    pub rest: Option<Rest>,
 }
 
 #[derive(Debug)]
@@ -188,7 +182,6 @@ impl Settings {
             consensus: consensus,
             cmd_args: command_arguments,
             log_settings: log_settings,
-            rest: config.rest,
         })
     }
 

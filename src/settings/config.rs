@@ -14,7 +14,6 @@ pub struct Config {
     pub grpc_peers: Option<Vec<SocketAddr>>,
     pub storage: Option<PathBuf>,
     pub logger: Option<ConfigLogSettings>,
-    pub rest: Option<Rest>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -72,10 +71,4 @@ impl FromStr for LogFormat {
 pub struct ConfigLogSettings {
     pub verbosity: Option<u8>,
     pub format: Option<LogFormat>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Rest {
-    pub listen: SocketAddr,
-    pub pkcs12: PathBuf,
 }
