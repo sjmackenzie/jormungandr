@@ -9,6 +9,9 @@ environment:
 
     # TODO Update this to match the name of your project.
     CRATE_NAME: trust
+    PRODUCTION_ADDRESS_PREFIX: "ceo"
+    TEST_ADDRESS_PREFIX: "teo"
+
 
   # TODO These are all the build jobs. Adjust as necessary. Comment out what you
   # don't need
@@ -39,6 +42,7 @@ install:
   - rustc -Vv
   - cargo -V
   - git submodule update --init --recursive
+  - mv src/bin/jcli.rs src/bin/luceo.rs
 
 test_script:
   # we don't run the "test phase" when doing deploys
