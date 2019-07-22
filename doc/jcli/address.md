@@ -28,15 +28,18 @@ group key:  ed25519_pk1pr7mnklkmtk8y5tel0gvnksldwywwkpzrt6vvvvmzus3jpldmtpsx9rnm
 
 ## Creating an address
 
-Each command following allows to create addresses for production and testing
-chains. For chains, where the discrimination is `testing`, you need to
-use the `--testing` flag.
+The following commands allow the creation of addresses for production and testing
+chains. Chains where the discrimination is set to `testing`, must use the `--testing` flag.
 
 There's 3 types of addresses:
 
 * Single address : A simple spending key. This doesn't have any stake in the system
 * Grouped address : A spending key attached to an account key. The stake is automatically
 * Account address : An account key. The account is its own stake
+
+Each command also requires a `--prefix` allowing you to set the human readable prefix of the address.
+For example setting `--prefix ta` will generate `ta1qvs5hf4zzan80cjr50f2j606u50lhtcszea9zd6cs0q8c74heux5xy4s2eu`
+setting `--prefix ca` will generate `ca1qvs5hf4zzan80cjr50f2j606u50lhtcszea9zd6cs0q8c74heux5xnf4ap2` etc.
 
 ### Address for UTxO
 
@@ -45,6 +48,7 @@ this address utilising the following command:
 
 ```
 $ jcli address \
+    --prefix ca \
     single ed25519e_pk1jnlhwdgzv3c9frknyv7twsv82su26qm30yfpdmvkzyjsdgw80mfqduaean
 ca1qw207ae4qfj8q4yw6v3ned6psa2r3tgrw9u3y9hdjcgj2p4pcaldyukyka8
 ```
@@ -55,6 +59,7 @@ public key as a second parameter of the command:
 ```
 $ jcli address \
     single \
+    --prefix ca \
     ed25519_pk1fxvudq6j7mfxvgk986t5f3f258sdtw89v4n3kr0fm6mpe4apxl4q0vhp3k \
     ed25519_pk1as03wxmy2426ceh8nurplvjmauwpwlcz7ycwj7xtl9gmx9u5gkqscc5ylx
 ca1q3yen35r2tmdye3zc5lfw3x992s7p4dcu4jkwxcda80tv8xh5ym74mqlzudkg42443nw08cxr7e9hmcuzals9ufsa9uvh723kvteg3vpvrcxcq
@@ -66,6 +71,8 @@ To create an account address you need the account public key and run:
 
 ```
 $ jcli address \
-    account ed25519_pk1c4yq3hflulynn8fef0hdq92579n3c49qxljasrl9dnuvcksk84gs9sqvc2
+    account \
+    --prefix ca \
+    ed25519_pk1c4yq3hflulynn8fef0hdq92579n3c49qxljasrl9dnuvcksk84gs9sqvc2
 ca1qhz5szxa8lnujwva8997a5q42nckw8z55qm7tkq0u4k03nz6zc74ze780qe
 ```

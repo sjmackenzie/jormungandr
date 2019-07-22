@@ -57,7 +57,7 @@ follow the instruction in [JCLI's address guide](../jcli/address.md). Utilise th
 registered previously as group address:
 
 ```
-jcli address single $(cat wallet_key.pub) $(cat stake_key.pub)
+jcli address single --prefix ta $(cat wallet_key.pub) $(cat stake_key.pub)
 ta1sjx4j3jwel94g0cgwzq9au7h6m8f5q3qnyh0gfnryl3xan6qnmjse3k2uv062mzj34eacjnxthxqv8fvdcn6f4xhxwa7ms729ak3gsl4qrq2mm
 ```
 

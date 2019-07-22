@@ -94,7 +94,7 @@ jcli transaction finalize  ca1q09u0nxmnfg7af8ycuygx57p5xgzmnmgtaeer9xun7hly6mlgt
 Now, if you run
 
 ```sh
-jcli transaction info --fee-constant 5 --fee-coefficient 2 --staging tx
+jcli transaction info --fee-constant 5 --fee-coefficient 2 --prefix ca --staging tx
 ```
 
 You should see something like this
